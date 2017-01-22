@@ -18,6 +18,7 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (onInput, onClick)
 import Http  exposing (..)
 import Json.Decode exposing (list, string, map6, field, decodeString)
+import Json.Encode exposing (list, string)
 import Dropdown
 
 -- MODEL
@@ -26,7 +27,8 @@ type alias Model =
   { categories : Dropdown.Dropdown,
     meals: Dropdown.Dropdown,
     comment: String,
-    input: String}
+    input: String
+  }
 
 type alias Meal =
   {
@@ -41,7 +43,7 @@ type alias Meal =
 {-| init. -}
 init : (Model, Cmd Msg)
 init =
-   ( Model ( Dropdown.init 0 [""]) (Dropdown.init 1 [""]) "" "", getCategories)
+   ( Model ( Dropdown.init 0 [""] False) (Dropdown.init 1 [""] True) "" "", getCategories)
 
 -- UPDATE
 
@@ -52,6 +54,7 @@ type Msg = NewCategories (Result Http.Error (List String))
   | AddComment
   | Input String
   | AddMeal
+  | SendMeal (Result Http.Error (List String))
 
 {-| Update. -}
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -59,16 +62,16 @@ update msg model =
   case msg of
 
     NewCategories (Ok categories) ->
-      ( {model | categories = (Dropdown.init model.categories.id categories)}, getMeals "завтрак")
+      ( {model | categories = (Dropdown.init model.categories.id categories model.categories.isEditable)}, getMeals "завтрак")
 
     NewCategories (Err _) ->
-      ( {model | categories = (Dropdown.init model.categories.id ["error"])}, Cmd.none )
+      ( {model | categories = (Dropdown.init model.categories.id ["error"] model.categories.isEditable)}, Cmd.none )
 
     NewMeals (Ok meals) ->
-      ( {model | meals = (Dropdown.init model.meals.id meals)}, Cmd.none )
+      ( {model | meals = (Dropdown.init model.meals.id meals model.meals.isEditable)}, Cmd.none )
 
     NewMeals (Err _) ->
-      ( {model | meals = (Dropdown.init model.meals.id ["error"])}, Cmd.none )
+      ( {model | meals = (Dropdown.init model.meals.id ["error"] model.meals.isEditable)}, Cmd.none )
 
     DropdownMsg 0 action->
       case action of
@@ -93,12 +96,28 @@ update msg model =
         ( {model | comment = model.input}, Cmd.none)
 
     AddMeal ->
+      ( model, postMeal model.meals.selected)
+
+    SendMeal (Ok _) ->
       ( model, Cmd.none)
+    SendMeal (Err _) ->
+      ( model, Cmd.none )
+
+
+postMeal: String ->  Cmd Msg
+postMeal mealName =
+  let
+    addedMealName =
+        Json.Encode.object
+          [ ("addedMeal", Json.Encode.string mealName)]
+  in
+  Http.send SendMeal<|
+      Http.post "http://localhost:3000/addedMeal" (Http.jsonBody addedMealName) (Json.Decode.list Json.Decode.string)
 
 getCategories : Cmd Msg
 getCategories =
   Http.send NewCategories <|
-    Http.get "http://localhost:3000/mealCategories" (Json.Decode.list string)
+    Http.get "http://localhost:3000/mealCategories" (Json.Decode.list Json.Decode.string)
 
 getMeals: String -> Cmd Msg
 getMeals categorie =
@@ -107,7 +126,7 @@ getMeals categorie =
 
 decodeMeal : String -> Json.Decode.Decoder (List String)
 decodeMeal categorie =
-        field categorie (Json.Decode.list string)
+        field categorie (Json.Decode.list Json.Decode.string)
 
 -- SUBSCRIPTIONS
 

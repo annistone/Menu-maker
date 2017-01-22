@@ -28,12 +28,13 @@ type alias Dropdown =
   , items: List String
   , selected: String
   , open: Bool
+  , isEditable: Bool
   }
 
 {-| Initializing the model. -}
-init : Int -> List String -> Dropdown
-init id valuesList =
-    Dropdown id valuesList ( Maybe.withDefault "" <| Array.get 0 <| Array.fromList valuesList ) False
+init : Int -> List String -> Bool -> Dropdown
+init id valuesList isEditable =
+    Dropdown id valuesList ( Maybe.withDefault "" <| Array.get 0 <| Array.fromList valuesList ) False isEditable
 
 -- UPDATE
 {-| Different message types the Dropdown can receive. -}

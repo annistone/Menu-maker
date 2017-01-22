@@ -67,10 +67,18 @@ update msg model =
       ( model, Cmd.none )
 
     AddMealFormMsg action->
-      let
-        (newAddForm, cmdAddForm) = AddMealForm.update action model.addForm
-      in
-        ( {model | addForm = newAddForm}, Cmd.map AddMealFormMsg cmdAddForm )
+      case action of
+          AddMealForm.AddMeal ->
+              let
+                (newAddForm, cmdAddForm) = AddMealForm.update action model.addForm
+              in
+              ({model | isOpenAddForm = False,
+                        addForm = newAddForm}, Cmd.map AddMealFormMsg cmdAddForm) --Server update weekMenu
+          _ ->
+            let
+              (newAddForm, cmdAddForm) = AddMealForm.update action model.addForm
+            in
+              ( {model | addForm = newAddForm}, Cmd.map AddMealFormMsg cmdAddForm )
 
 
 -- SUBSCRIPTIONS
@@ -169,7 +177,7 @@ postDayAndMealId dayId categorieName =
             , ("categorie", Json.Encode.string categorieName)
             ]
       in
-        Http.post "http://localhost:3000/addedDayIdAndMeal" (Http.jsonBody addedMealData) string
+        Http.post "http://localhost:3000/addedDayIdAndMealtime" (Http.jsonBody addedMealData) string
 
 viewAddDishButton2 : Int -> String -> Html Msg
 viewAddDishButton2 dayId mealName =

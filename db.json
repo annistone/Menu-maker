@@ -1,7 +1,10 @@
 {
-  "addedDayIdAndMeal": {
-    "dayId": 2,
-    "categorie": "snack"
+  "addedDayIdAndMealtime": {
+    "dayId": 4,
+    "categorie": "lunch"
+  },
+  "addedMeal": {
+    "addedMeal": "творог"
   },
   "mealCategories": [
     "завтрак",
