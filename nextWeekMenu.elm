@@ -20,18 +20,28 @@ main =
 
 -- MODEL
 
-type alias OneDayMenu =
+type alias MealtimeMenu =
+  {
+    mealtimeId: Int,
+    days: List DayMenu
+  }
+
+type alias DayMenu =
   {
     dayId: Int,
-    breakfast: List String,
-    lunch: List String,
-    dinner: List String,
-    snack: List String
+    meals: List Meal
+  }
+
+type alias Meal =
+  {
+    categorieId: Int,
+    mealId: Int
   }
 
 type alias Model =
   {
-    weekMenu: List OneDayMenu,
+    weekMenu: List List List String,
+    mealsDataBase: List AddMealForm.MealsOfCategory
     isOpenAddForm: Bool,
     addForm: AddMealForm.Model
   }
@@ -41,14 +51,14 @@ init =
   let
     (initAddForm, cmdAddForm) = AddMealForm.init
   in
-    ( Model [] False initAddForm, Cmd.batch [getWeekMenu, Cmd.map AddMealFormMsg cmdAddForm] )
+    ( Model [] False initAddForm, Cmd.batch [Cmd.map AddMealFormMsg cmdAddForm, AddMealForm.getMeals] )
 
 -- UPDATE
 
 
 type Msg
   = AddDish Int String
-  | NewWeekMenu (Result Http.Error (List OneDayMenu))
+  | NewWeekMenu (Result Http.Error (List MealtimeMenu))
   | SendDayIdAndMeal (Result Http.Error String)
   | AddMealFormMsg AddMealForm.Msg
 
@@ -57,7 +67,10 @@ update msg model =
   case msg of
     AddDish dayId mealName ->
       ({model | isOpenAddForm = True}, postDayAndMealId dayId mealName)
-    NewWeekMenu (Ok weekMenu) ->
+    NewWeekMenu (Ok jsonWeekMenu) ->
+      let
+       weekMenu = idToString jsonWeekMenu model.mealsDataBase
+      in
       ({ model | weekMenu = weekMenu}, Cmd.none)
     NewWeekMenu (Err _) ->
       ( model, Cmd.none )
@@ -67,10 +80,18 @@ update msg model =
       ( model, Cmd.none )
 
     AddMealFormMsg action->
-      let
-        (newAddForm, cmdAddForm) = AddMealForm.update action model.addForm
-      in
-        ( {model | addForm = newAddForm}, Cmd.map AddMealFormMsg cmdAddForm )
+      if ( model.isOpenAddForm == False) then
+        case action of
+          AddMealForm.NewMeals (Ok jsonMeals) ->
+            ( {model | mealsDataBase = jsonMeals}, getWeekMenu)
+          AddMealForm.NewMeals (Err _) ->
+            ( {model | mealsDataBase = []}, Cmd.none)
+      else
+          let
+            (newAddForm, cmdAddForm) = AddMealForm.update action model.addForm
+          in
+            ( {model | addForm = newAddForm}, Cmd.map AddMealFormMsg cmdAddForm )
+
 
 
 -- SUBSCRIPTIONS
@@ -97,15 +118,21 @@ view model =
                , th[][text "Суббота"]
                , th[][text "Воскресенье"]
             ],
-             tr[] <| List.append [th[style tdStyles][text "Завтрак"]] (List.map (\day -> viewOneMealtimeMenu day "завтрак") model.weekMenu)
-            , tr[] <| List.append [th[style tdStyles][text "Обед"]] (List.map (\day -> viewOneMealtimeMenu day "обед") model.weekMenu)
-            , tr[] <| List.append [th[style tdStyles][text "Ужин"]] (List.map (\day -> viewOneMealtimeMenu day "ужин") model.weekMenu)
-            , tr[] <| List.append [th[style tdStyles][text "Перекус"]] (List.map (\day -> viewOneMealtimeMenu day "перекус") model.weekMenu)
+             table[] (List.map (\mealtime -> viewMealtimeMenu mealtime) model.weekMenu)
        ],
        viewAddMealForm model.isOpenAddForm model.addForm
      ]
 
 -- OTHER
+
+idToString: List MealtimeMenu -> List AddMealForm.MealsOfCategory-> List List List String
+idToString jsonWeekMenu mealDataBase=
+  List.map (\mealtime -> (List.map (\day -> (List.map (\meal ->
+    --IDs for ready server only!!! 
+    Maybe.withDefault AddMealForm.errorMealsOfCategory List.head
+      (List.filter (\category -> (category.id == meal.categoryId)) mealDataBase)
+    )) day.meals) mealtime.days)) jsonWeekMenu
+
 viewAddMealForm : Bool -> AddMealForm.Model ->  Html Msg
 viewAddMealForm isOpen addForm =
   if (isOpen) then
@@ -114,50 +141,47 @@ viewAddMealForm isOpen addForm =
     div[style <| formStyle "hidden"][ Html.map AddMealFormMsg <| AddMealForm.view addForm]
 
 
-viewOneMealtimeMenu : OneDayMenu -> String ->Html Msg
-viewOneMealtimeMenu day mealtime =
-    case mealtime of
-      "завтрак" ->
+viewMealtimeMenu : MealtimeMenu ->Html Msg
+viewMealtimeMenu mealtimeMenu =
+       tr[] (List.map (\day ->
         td[style tdStyles][
-          viewOneMealMenu day.breakfast,
-          viewAddDishButton day.dayId "breakfast"
-        ]
-      "обед" ->
-        td[style tdStyles][
-          viewOneMealMenu day.lunch,
-          viewAddDishButton day.dayId "lunch"
-        ]
-      "ужин" ->
-        td[style tdStyles][
-          viewOneMealMenu day.dinner,
-          viewAddDishButton day.dayId "dinner"
-        ]
-      "перекус" ->
-        td[style tdStyles][
-          viewOneMealMenu day.snack,
-          viewAddDishButton day.dayId "snack"
-        ]
-      _ -> td[][]
+            viewDayMenu day,
+            viewAddDishButton 0 "snack"
+        ])
+      mealtimeMenu.days)
 
-viewOneMealMenu : List String -> Html Msg
-viewOneMealMenu meal =
+
+viewDayMenu : DayMenu -> Html Msg
+viewDayMenu dayMenu =
    ul [style ulStyles]
-   (List.map (\l -> li [] [ text l]) meal)
+   (List.map (\meal -> li [] [ text getMealName meal]) dayMenu.meals)
+
+getMealName : Meal -> String
+getMealName meal =
+  List.filter ( = meal.categorieId)
 
 getWeekMenu: Cmd Msg
 getWeekMenu =
   Http.send NewWeekMenu <|
-    Http.get "http://localhost:3000/weekMenu" (Json.Decode.list dayMenu)
+    Http.get "http://localhost:3000/NJ_weekMenu" (Json.Decode.list decodeMealtimeMenu)
 
-dayMenu : Json.Decode.Decoder OneDayMenu
-dayMenu =
-        map5 OneDayMenu
-          (field "dayId" (int))
-          (field "breakfast" (Json.Decode.list string))
-          (field "lunch" (Json.Decode.list string))
-          (field "dinner" (Json.Decode.list string))
-          (field "snack" (Json.Decode.list string))
+decodeMealMenu : Json.Decode.Decoder MealMenu
+decodeMealMenu =
+        map2 MealtimeMenu
+          (field "mealtimeId" int)
+          (field "days" Json.Decode.list decodeDayMenu)
 
+decodeDayMenu : Json.Decode.Decoder Mealtime
+decodeDayMenu =
+        map2 Mealtime
+          (field "dayId" int)
+          (field "meals" Json.Decode.list decodeMeal)
+
+decodeMeal : Json.Decode.Decoder Meal
+decodeMeal =
+        map2 Meal
+          (field "categorieId" int)
+          (field "mealId" int)
 
 postDayAndMealId: Int -> String ->  Cmd Msg
 postDayAndMealId dayId categorieName =
