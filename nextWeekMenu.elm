@@ -41,7 +41,6 @@ type alias Meal =
 type alias Model =
   {
     weekMenu: List List List String,
-    mealsDataBase: List AddMealForm.MealsOfCategory
     isOpenAddForm: Bool,
     addForm: AddMealForm.Model
   }
@@ -116,22 +115,17 @@ view model =
                , th[][text "Четверг"]
                , th[][text "Пятница"]
                , th[][text "Суббота"]
-               , th[][text "Воскресенье"]
+               , th[][text "Воскресенье"] 
             ],
-             table[] (List.map (\mealtime -> viewMealtimeMenu mealtime) model.weekMenu)
+             tr[] <| List.append [th[style tdStyles][text "Завтрак"]] (List.map (\mealtime -> viewDayMenu mealtime.days "завтрак")
+             Maybe.withDefault [] <| Array.get 0 (Array.fromList model.weekMenu))
+            {-, tr[] <| List.append [th[style tdStyles][text "Обед"]] (List.map (\day -> viewOneMealtimeMenu day "обед") model.weekMenu)
+            , tr[] <| List.append [th[style tdStyles][text "Ужин"]] (List.map (\day -> viewOneMealtimeMenu day "ужин") model.weekMenu)-}
        ],
        viewAddMealForm model.isOpenAddForm model.addForm
      ]
 
 -- OTHER
-
-idToString: List MealtimeMenu -> List AddMealForm.MealsOfCategory-> List List List String
-idToString jsonWeekMenu mealDataBase=
-  List.map (\mealtime -> (List.map (\day -> (List.map (\meal ->
-    --IDs for ready server only!!! 
-    Maybe.withDefault AddMealForm.errorMealsOfCategory List.head
-      (List.filter (\category -> (category.id == meal.categoryId)) mealDataBase)
-    )) day.meals) mealtime.days)) jsonWeekMenu
 
 viewAddMealForm : Bool -> AddMealForm.Model ->  Html Msg
 viewAddMealForm isOpen addForm =
@@ -141,20 +135,12 @@ viewAddMealForm isOpen addForm =
     div[style <| formStyle "hidden"][ Html.map AddMealFormMsg <| AddMealForm.view addForm]
 
 
-viewMealtimeMenu : MealtimeMenu ->Html Msg
-viewMealtimeMenu mealtimeMenu =
-       tr[] (List.map (\day ->
-        td[style tdStyles][
-            viewDayMenu day,
-            viewAddDishButton 0 "snack"
-        ])
-      mealtimeMenu.days)
-
-
 viewDayMenu : DayMenu -> Html Msg
 viewDayMenu dayMenu =
-   ul [style ulStyles]
-   (List.map (\meal -> li [] [ text getMealName meal]) dayMenu.meals)
+  td[style tdStyles][
+     ul [style ulStyles]
+      li [] [ text getDayMenu dayMenu.meal]
+   ]
 
 getMealName : Meal -> String
 getMealName meal =
