@@ -7,7 +7,7 @@ import Json.Encode
 import Http  exposing (..)
 import List
 import AddMealForm
-
+import NewReceptForm
 
 main =
   Html.program
@@ -33,15 +33,19 @@ type alias Model =
   {
     weekMenu: List OneDayMenu,
     isOpenAddForm: Bool,
-    addForm: AddMealForm.Model
+    addForm: AddMealForm.Model,
+    isOpenNewReceptForm: Bool,
+    newReceptForm: NewReceptForm.Model
   }
 
 init :  (Model, Cmd Msg)
 init =
   let
     (initAddForm, cmdAddForm) = AddMealForm.init
+    (initNewReceptForm, cmdNewReceptForm) = NewReceptForm.init
   in
-    ( Model [] False initAddForm, Cmd.batch [getWeekMenu, Cmd.map AddMealFormMsg cmdAddForm] )
+    ( Model [] False initAddForm True initNewReceptForm,
+      Cmd.batch [getWeekMenu, Cmd.map AddMealFormMsg cmdAddForm, Cmd.map NewReceptFormMsg cmdNewReceptForm] )
 
 -- UPDATE
 
@@ -51,6 +55,7 @@ type Msg
   | NewWeekMenu (Result Http.Error (List OneDayMenu))
   | SendDayIdAndMeal (Result Http.Error String)
   | AddMealFormMsg AddMealForm.Msg
+  | NewReceptFormMsg NewReceptForm.Msg
 
 update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
@@ -80,7 +85,11 @@ update msg model =
             in
               ( {model | addForm = newAddForm}, Cmd.map AddMealFormMsg cmdAddForm )
 
-
+    NewReceptFormMsg action->
+        let
+          (newReceptForm, cmdReceptForm) = NewReceptForm.update action model.newReceptForm
+        in
+          ( {model | newReceptForm = newReceptForm}, Cmd.map NewReceptFormMsg cmdReceptForm )
 -- SUBSCRIPTIONS
 
 
@@ -110,7 +119,8 @@ view model =
             , tr[] <| List.append [th[style tdStyles][text "Ужин"]] (List.map (\day -> viewOneMealtimeMenu day "ужин") model.weekMenu)
             , tr[] <| List.append [th[style tdStyles][text "Перекус"]] (List.map (\day -> viewOneMealtimeMenu day "перекус") model.weekMenu)
        ],
-       viewAddMealForm model.isOpenAddForm model.addForm
+       viewAddMealForm model.isOpenAddForm model.addForm,
+       viewNewReceptForm model.isOpenNewReceptForm model.newReceptForm
      ]
 
 -- OTHER
@@ -121,6 +131,12 @@ viewAddMealForm isOpen addForm =
   else
     div[style <| formStyle "hidden"][ Html.map AddMealFormMsg <| AddMealForm.view addForm]
 
+viewNewReceptForm : Bool -> NewReceptForm.Model ->  Html Msg
+viewNewReceptForm isOpen newReceptForm =
+  if (isOpen) then
+    div[style <| formStyle "visible"][ Html.map NewReceptFormMsg <| NewReceptForm.view newReceptForm]
+  else
+    div[style <| formStyle "hidden"][ Html.map NewReceptFormMsg <| NewReceptForm.view newReceptForm]
 
 viewOneMealtimeMenu : OneDayMenu -> String ->Html Msg
 viewOneMealtimeMenu day mealtime =

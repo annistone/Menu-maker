@@ -83,6 +83,8 @@ update msg model =
             getMeals item)
         Dropdown.Toogle ->
             ( {model | categories = Dropdown.update action model.categories}, Cmd.none )
+        _ ->
+          ( model, Cmd.none)
 
     DropdownMsg 1 action->
       ( {model | meals = Dropdown.update action model.meals}, Cmd.none)

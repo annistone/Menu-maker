@@ -27,20 +27,21 @@ type alias Dropdown =
     id: Int
   , items: List String
   , selected: String
-  , open: Bool
+  , isOpen: Bool
   , isEditable: Bool
   }
 
 {-| Initializing the model. -}
 init : Int -> List String -> Bool -> Dropdown
 init id valuesList isEditable =
-    Dropdown id valuesList ( Maybe.withDefault "" <| Array.get 0 <| Array.fromList valuesList ) False isEditable
+    Dropdown id valuesList ( Maybe.withDefault "default" <| Array.get 0 <| Array.fromList valuesList ) False isEditable
 
 -- UPDATE
 {-| Different message types the Dropdown can receive. -}
 type Msg
   = Select String
   | Toogle
+  | AddNewItem
 
 {-| Elm architecture reducer. -}
 update : Msg -> Dropdown -> Dropdown
@@ -48,20 +49,26 @@ update msg model =
   case msg of
     Select item ->
       { model | selected = item,
-                open = False }
+                isOpen = False }
     Toogle ->
-      { model | open = not model.open }
+      { model | isOpen = not model.isOpen }
 
+    AddNewItem ->
+      model
 -- VIEW
 {-| Dropdown view. -}
 view : Dropdown -> Html Msg
 view model =
-  if model.open then
+  if model.isOpen then
     div [ style divStyles]
     [
         ul [ style listStyles]
         ( List.map (\item ->
-            li [ onClick <| Select item, style listStyles] [ text item]) model.items)
+            li [ onClick <| Select item, style ulStyles] [ text item]) model.items),
+        if model.isEditable then
+          button [onClick AddNewItem] [ text "Добавить" ]
+        else
+          div[][]
     ]
   else
     div [ style divStyles, onClick Toogle ]
@@ -74,12 +81,20 @@ view model =
 divStyles : List (String, String)
 divStyles =
     [
-        ("cursor", "default")
+        ("cursor", "default"),
+        ("margin-left","10px")
     ]
 listStyles : List (String, String)
 listStyles =
     [
-        ("list-style-type","none"),
-        ("margin","0"),
+        ("list-style-type","circle"),
+        ("margin","0px"),
+        ("margin-left","10px"),
+        ("padding","0")
+    ]
+
+ulStyles : List (String, String)
+ulStyles =
+    [
         ("padding","0")
     ]

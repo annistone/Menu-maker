@@ -1,10 +1,13 @@
 {
   "addedDayIdAndMealtime": {
-    "dayId": 4,
-    "categorie": "lunch"
+    "dayId": 2,
+    "categorie": "breakfast"
   },
   "addedMeal": {
     "addedMeal": "творог"
+  },
+  "addedRecept": {
+    "addedMeal": "овсяная каша"
   },
   "mealCategories": [
     "завтрак",
@@ -172,33 +175,10 @@
       ]
     }
   ],
-  "dayMenu": {
-    "breakfast": [
-      "овсяная каша",
-      "чай"
-    ],
-    "lunch": [
-      "борщ",
-      "хлеб"
-    ],
-    "dinner": [
-      "гречка с фаршем"
-    ],
-    "snack": [
-      "кефир",
-      "сухари"
-    ]
-  },
-  "suitcase": {
-    "book": {
-      "name": "Zamok",
-      "writter": "Cafka"
-    },
-    "snack": "sandwich",
-    "devices": [
-      "phone",
-      "pleer",
-      "tablet"
-    ]
-  }
+  "products": [
+    "овсянка",
+    "молоко",
+    "соль",
+    "сахар"
+  ]
 }
