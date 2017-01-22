@@ -25,33 +25,20 @@ import Array
 type alias Dropdown =
   {
     id: Int
-  , items: List Item
-  , selected: Item
+  , items: List String
+  , selected: String
   , open: Bool
   }
 
-type alias Item =
-  {
-    id: Int
-  , name: String
-  }
-
-defaultSelect: Item
-defaultSelect =
-  {
-    id = 0
-  , name = "default"
-  }
-
 {-| Initializing the model. -}
-init : Int -> List Item -> Dropdown
+init : Int -> List String -> Dropdown
 init id valuesList =
-    Dropdown id valuesList ( Maybe.withDefault defaultSelect <| Array.get 0 <| Array.fromList valuesList ) False
+    Dropdown id valuesList ( Maybe.withDefault "" <| Array.get 0 <| Array.fromList valuesList ) False
 
 -- UPDATE
 {-| Different message types the Dropdown can receive. -}
 type Msg
-  = Select Item
+  = Select String
   | Toogle
 
 {-| Elm architecture reducer. -}
@@ -73,12 +60,12 @@ view model =
     [
         ul [ style listStyles]
         ( List.map (\item ->
-            li [ onClick <| Select item, style listStyles] [ text item.name]) model.items)
+            li [ onClick <| Select item, style listStyles] [ text item]) model.items)
     ]
   else
     div [ style divStyles, onClick Toogle ]
     [
-      text model.selected.name
+      text model.selected
     ]
 
 -- OTHER

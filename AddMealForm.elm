@@ -46,8 +46,8 @@ init =
 -- UPDATE
 
 {-| messeges. -}
-type Msg = Categories (Result Http.Error (List String))
-  | Meals (Result Http.Error (List String))
+type Msg = NewCategories (Result Http.Error (List String))
+  | NewMeals (Result Http.Error (List String))
   | DropdownMsg Int Dropdown.Msg
   | AddComment
   | Input String
@@ -58,26 +58,26 @@ update : Msg -> Model -> (Model, Cmd Msg)
 update msg model =
   case msg of
 
-    Categories (Ok categories) ->
+    NewCategories (Ok categories) ->
       ( {model | categories = (Dropdown.init model.categories.id categories)}, getMeals "завтрак")
 
-    Categories (Err _) ->
+    NewCategories (Err _) ->
       ( {model | categories = (Dropdown.init model.categories.id ["error"])}, Cmd.none )
 
-    Meals (Ok meals) ->
+    NewMeals (Ok meals) ->
       ( {model | meals = (Dropdown.init model.meals.id meals)}, Cmd.none )
 
-    Meals (Err _) ->
+    NewMeals (Err _) ->
       ( {model | meals = (Dropdown.init model.meals.id ["error"])}, Cmd.none )
 
     DropdownMsg 0 action->
       case action of
         Dropdown.Select item  ->
           ( {model | categories = Dropdown.update action model.categories},
-          if (item.id == model.categories.selected.id) then
+          if (item == model.categories.selected) then
             Cmd.none
           else
-            getMeals item.name )
+            getMeals item)
         Dropdown.Toogle ->
             ( {model | categories = Dropdown.update action model.categories}, Cmd.none )
 
@@ -97,12 +97,12 @@ update msg model =
 
 getCategories : Cmd Msg
 getCategories =
-  Http.send Categories <|
+  Http.send NewCategories <|
     Http.get "http://localhost:3000/mealCategories" (Json.Decode.list string)
 
 getMeals: String -> Cmd Msg
 getMeals categorie =
-  Http.send Meals <|
+  Http.send NewMeals <|
     Http.get "http://localhost:3000/meals"  (decodeMeal categorie)
 
 decodeMeal : String -> Json.Decode.Decoder (List String)
