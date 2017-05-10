@@ -1,8 +1,10 @@
-import Html exposing (Html, div, table, tr, text, th, td, button, ul, li, a, col, colgroup)
+module WeekMenu exposing (..)
+
+import Html exposing (Html, div, table, tr, text, th, td, button)
 import Html.Attributes exposing (..)
 import Html.Events exposing (onInput, onClick)
 import String
-import Json.Decode exposing (list, string, map4, map7, field, int, bool, array)
+import Json.Decode exposing (list, string, map7, field, int, bool, array)
 import Json.Encode
 import Http  exposing (..)
 import List
@@ -11,22 +13,6 @@ import Maybe
 import Debug
 import Base64 exposing (..)
 import Json.Decode.Extra exposing ((|:))
-
-
-main
-    = Html.program
-    { init = init
-    , view = view
-    , update = update
-    , subscriptions = subscriptions
-    }
-
-
-type alias Model =
-    { weekMenu: Array.Array DayMenu
-    , mealsCatalog: Array.Array Meal
-    , error: String
-    }
 
 
 type alias Meal =
@@ -55,59 +41,6 @@ type alias DayMenu =
     }
 
 
-init :  (Model, Cmd Msg)
-init =
-    ({ weekMenu =  Array.fromList []
-      , mealsCatalog =  Array.fromList []
-      , error = "None"}
-    , getWeekMenu)
-
-
-type Msg
-    = NewWeekMenu (Result Http.Error (Array.Array DayMenu))
-    | NewMealsCatalog (Result Http.Error (Array.Array Meal))
-
-
-update : Msg -> Model -> (Model, Cmd Msg)
-update msg model =
-    case msg of
-        NewWeekMenu (Ok newWeekMenu) ->
-            ({model | weekMenu = sortMenus newWeekMenu}, getMealsCatalog)
-
-        NewWeekMenu (Err errorDescr) ->
-            ({model | error = toString errorDescr}, Cmd.none )
-
-        NewMealsCatalog (Ok newMealCatalog) ->
-            ({model | mealsCatalog = newMealCatalog}, Cmd.none)
-
-        NewMealsCatalog (Err errorDescr) ->
-            ({model | error = toString errorDescr}, Cmd.none )
-
-
-view : Model -> Html Msg
-view model =
-    div[]
-        [ table[style tableStyles]
-            <| List.append
-            [ tr[]
-                [ th[style unitStyles][text ""]
-                , th[style unitStyles][text "Понедельник"]
-                , th[style unitStyles][text "Вторник"]
-                , th[style unitStyles][text "Среда"]
-                , th[style unitStyles][text "Четверг"]
-                , th[style unitStyles][text "Пятница"]
-                , th[style unitStyles][text "Суббота"]
-                , th[style unitStyles][text "Воскресенье"]
-                ]
-            ]
-            <| List.map (\l -> viewMealtimeMenus l model) [0,1,2,3]
-        , div[]
-            [ text
-            <| "Error:" ++ model.error
-            ]
-        ]
-
-
 sortMenus: Array.Array DayMenu -> Array.Array DayMenu
 sortMenus weekMenu =
     Array.fromList
@@ -124,21 +57,13 @@ mealtimeNumberToMealtimeName mealtimeNumber =
         3 -> "Перекус"
         _ -> ""
 
-viewMealtimeMenus: Int -> Model -> Html Msg
-viewMealtimeMenus mealtimeNumber model =
-    tr[style unitStyles]
-    <| List.append
-    [ td[style <| List.append headerStyles unitStyles][text <| mealtimeNumberToMealtimeName mealtimeNumber]
-    ]
-    <| List.map (\l -> td[style unitStyles][ text <| mealText mealtimeNumber l model]) [0,1,2,3,4,5,6]
 
-
-mealIdToMealName : Model -> Int -> String
-mealIdToMealName model mealId =
+mealIdToMealName : Array.Array Meal -> Int -> String
+mealIdToMealName mealsCatalog mealId =
     List.foldr (++) ""
     <| List.map .name
     <| List.filter (\l -> l.mealId == mealId)
-    <| Array.toList model.mealsCatalog
+    <| Array.toList mealsCatalog
 
 
 mealtimeNumberToMealtimeMenu: Int -> DayMenu -> List Int
@@ -151,11 +76,11 @@ mealtimeNumberToMealtimeMenu mealtimeNumber dayMenu =
         _ -> []
 
 
-mealText: Int -> Int -> Model -> String
-mealText mealtimeNumber dayNumber model =
+mealText: Int -> Int -> Array.Array DayMenu -> Array.Array Meal -> String
+mealText mealtimeNumber dayNumber weekMenu mealsCatalog =
     List.foldr (++) ""
     <| List.intersperse ", "
-    <| List.map (\l -> mealIdToMealName model l)
+    <| List.map (\l -> mealIdToMealName mealsCatalog l)
     <| mealtimeNumberToMealtimeMenu mealtimeNumber
     <| Maybe.withDefault
         { day = ""
@@ -166,14 +91,9 @@ mealText mealtimeNumber dayNumber model =
         , dinnerMenuIds = []
         , snacksIds = []
         }
-    <| Array.get dayNumber model.weekMenu
+    <| Array.get dayNumber weekMenu
 
 
-getMealsCatalog: Cmd Msg
-getMealsCatalog =
-    Http.send NewMealsCatalog
-    <| getWithAuthorization "http://localhost:8080/api/mealscatalog"
-    <| field "mealscatalogs" <| Json.Decode.array mealDecoder
 
 mealDecoder: Json.Decode.Decoder Meal
 mealDecoder =
@@ -191,29 +111,6 @@ mealDecoder =
         |: (field "carbohydrates" int)
 
 
-getWithAuthorization : String -> Json.Decode.Decoder a -> Request a
-getWithAuthorization url decoder =
-    let encodedAuthString =
-        Result.withDefault ""
-        <| Base64.encode "XfdfydY0q4ha0mOPWcHOli9+Il23vxWy:"
-    in request
-        { method = "GET"
-        , headers = [ Http.header "Authorization" <| "Basic " ++ encodedAuthString]
-        , url = url
-        , body = emptyBody
-        , expect = expectJson decoder
-        , timeout = Nothing
-        , withCredentials = False
-        }
-
-
-getWeekMenu: Cmd Msg
-getWeekMenu =
-    Http.send NewWeekMenu
-    <| getWithAuthorization "http://localhost:8080/api/thisweekmenu"
-    <| field "thisweekmenus"
-    <| Json.Decode.array dayMenuDecoder
-
 dayMenuDecoder: Json.Decode.Decoder DayMenu
 dayMenuDecoder =
     map7 DayMenu
@@ -224,29 +121,3 @@ dayMenuDecoder =
         (field "lunchMenuIds" (Json.Decode.list int))
         (field "dinnerMenuIds" (Json.Decode.list int))
         (field "snacksIds" (Json.Decode.list int))
-
-
-tableStyles : List (String, String)
-tableStyles =
-    [ ("border", "1px solid black")
-    , ("margin", "0 auto")
-    , ("margin-top", "60px")
-    , ("border-collapse", "collapse")
-    ]
-
-
-unitStyles : List (String, String)
-unitStyles =
-    [ ("border","1px solid black")
-    , ("padding", "10px")
-    ]
-
-headerStyles : List (String, String)
-headerStyles =
-    [ ("font-weight", "bold")
-    ]
-
-
-subscriptions : Model -> Sub Msg
-subscriptions model =
-    Sub.none
