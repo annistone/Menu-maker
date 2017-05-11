@@ -1,16 +1,10 @@
-module WeekMenu exposing (..)
+module WeekMenu exposing(..)
 
-import Html exposing (Html, div, table, tr, text, th, td, button)
-import Html.Attributes exposing (..)
-import Html.Events exposing (onInput, onClick)
 import String
 import Json.Decode exposing (list, string, map7, field, int, bool, array)
-import Json.Encode
-import Http  exposing (..)
 import List
 import Array
 import Maybe
-import Debug
 import Base64 exposing (..)
 import Json.Decode.Extra exposing ((|:))
 
@@ -47,6 +41,18 @@ sortMenus weekMenu =
     <|List.sortBy .dayId
     <| Array.toList weekMenu
 
+dayNumberToDayName: Int -> String
+dayNumberToDayName dayNumber =
+    case dayNumber of
+        0 -> "Понедельник"
+        1 -> "Вторник"
+        2 -> "Среда"
+        3 -> "Четверг"
+        4 -> "Пятница"
+        5 -> "Суббота"
+        6 -> "Воскресенье"
+        _ -> ""
+
 
 mealtimeNumberToMealtimeName: Int -> String
 mealtimeNumberToMealtimeName mealtimeNumber =
@@ -57,9 +63,8 @@ mealtimeNumberToMealtimeName mealtimeNumber =
         3 -> "Перекус"
         _ -> ""
 
-
 mealIdToMealName : Array.Array Meal -> Int -> String
-mealIdToMealName mealsCatalog mealId =
+mealIdToMealName  mealsCatalog mealId =
     List.foldr (++) ""
     <| List.map .name
     <| List.filter (\l -> l.mealId == mealId)
@@ -92,7 +97,6 @@ mealText mealtimeNumber dayNumber weekMenu mealsCatalog =
         , snacksIds = []
         }
     <| Array.get dayNumber weekMenu
-
 
 
 mealDecoder: Json.Decode.Decoder Meal
