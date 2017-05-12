@@ -3,7 +3,7 @@ import Html.Attributes exposing (..)
 import Html.Events exposing (onInput, onClick)
 import String
 import Json.Decode exposing (list, string, map7, field, int, bool, array)
-import Http  exposing (..)
+import Http exposing (..)
 import List
 import Array
 import Maybe
@@ -25,10 +25,13 @@ main
 type alias Model =
     { weekMenu: Array.Array WeekMenu.DayMenu
     , mealsCatalog: Array.Array WeekMenu.Meal
-    , error: String
+    , log: String
     , editMenuFlag: Bool
-    , editMenuMealtimeAndDay: (Int, Int)
+    , editMenuMealtime: Int
+    , editMenuDay: Int
+    , editMenuMealId: Int
     , editMenuViewMealsFlag: Bool
+    , createMealFlag: Bool
     }
 
 
@@ -36,10 +39,13 @@ init :  (Model, Cmd Msg)
 init =
     ({ weekMenu =  Array.fromList []
      , mealsCatalog =  Array.fromList []
-     , error = "None"
+     , log = "None"
      , editMenuFlag = False
-     , editMenuMealtimeAndDay = (0,0)
+     , editMenuMealtime = 0
+     , editMenuDay = 0
+     , editMenuMealId = 0
      , editMenuViewMealsFlag = False
+     , createMealFlag = False
      }
     , getWeekMenu)
 
@@ -50,6 +56,8 @@ type Msg
     | EditMenu Int Int
     | OpenMealsCatalog
     | AddMealToMenu Int
+    | PutMealToMenu (Result Http.Error ())
+    | OpenCreateMealWindow
 
 
 update : Msg -> Model -> (Model, Cmd Msg)
@@ -59,26 +67,39 @@ update msg model =
             ({model | weekMenu = WeekMenu.sortMenus newWeekMenu}, getMealsCatalog)
 
         NewWeekMenu (Err errorDescr) ->
-            ({model | error = toString errorDescr}, Cmd.none )
+            ({model | log = toString errorDescr}, Cmd.none )
 
         NewMealsCatalog (Ok newMealCatalog) ->
             ({model | mealsCatalog = newMealCatalog}, Cmd.none)
 
         NewMealsCatalog (Err errorDescr) ->
-            ({model | error = toString errorDescr}, Cmd.none )
+            ({model | log = toString errorDescr}, Cmd.none )
 
         EditMenu mealtimeNumber dayNumber ->
             ({model |
                 editMenuFlag = True
-                , editMenuMealtimeAndDay = (mealtimeNumber, dayNumber)
+                , editMenuMealtime = mealtimeNumber
+                , editMenuDay = dayNumber
             }, Cmd.none )
 
         OpenMealsCatalog ->
             ({model | editMenuViewMealsFlag = True}, Cmd.none )
 
         AddMealToMenu mealId ->
-            (model, addMealToMenu mealId)
+            ({model | editMenuMealId = mealId}, addMealToMenu {model | editMenuMealId = mealId})
 
+        PutMealToMenu (Ok answer) ->
+            ({model |
+                log = toString answer
+                , editMenuFlag = False
+                , editMenuViewMealsFlag = False
+            }, getWeekMenu)
+
+        PutMealToMenu (Err errorDescr) ->
+            ({model | log = toString errorDescr}, Cmd.none )
+
+        OpenCreateMealWindow ->
+            ({model | createMealFlag = True}, Cmd.none )
 
 view : Model -> Html Msg
 view model =
@@ -98,14 +119,12 @@ view model =
                 <| List.map (\l -> viewMealtimeMenus l model) [0,1,2,3]
 
         , if model.editMenuFlag then
-            let (mealtimeNumber, dayNumber) = model.editMenuMealtimeAndDay
-            in
             div[ style containerStyles]
                 [ div[][ text <| String.concat
                     [ "Изменить "
-                    , WeekMenu.mealtimeNumberToMealtimeName mealtimeNumber
+                    , WeekMenu.mealtimeNumberToMealtimeName model.editMenuMealtime
                     , " в "
-                    , WeekMenu.dayNumberToDayName dayNumber
+                    , WeekMenu.dayNumberToDayName model.editMenuDay
                     ]]
                 , button [onClick OpenMealsCatalog, style buttonStyles][text "Добавить блюдо"]
                 , if model.editMenuViewMealsFlag then
@@ -113,11 +132,28 @@ view model =
                 else div[][]
                 ]
         else div[][]
-        , div[][ text <| "Error:" ++ model.error]
+        , div[][ text <| "Log:" ++ model.log]
+        , button [onClick OpenCreateMealWindow, style buttonStyles][text "Создать блюдо"]
+        , if model.createMealFlag then
+            div[ style containerStyles]
+                [ div[][ text "Создать блюдо"]
+                , button [ style buttonStyles][text "Добавить блюдо"]
+                , if model.editMenuViewMealsFlag then
+                    div[][]
+                else div[][]
+                ]
+        else div[][]
         ]
 
-addMealToMenu: Int -> Cmd Msg
-addMealToMenu mealId = Cmd.none
+
+addMealToMenu: Model -> Cmd Msg
+addMealToMenu model =
+    Http.send PutMealToMenu
+    <| putWithAuthorization
+    (WeekMenu.formAddMealBody model.editMenuMealtime model.editMenuDay model.editMenuMealId model.weekMenu)
+    ("http://localhost:8080/api/thisweekmenu/" ++ .id
+      (WeekMenu.dayNumToDayMenu model.editMenuDay model.weekMenu))
+
 
 viewMealsByCategory : Model -> Int -> List (Html Msg)
 viewMealsByCategory model categoryId =
@@ -175,8 +211,8 @@ getWithAuthorization url decoder =
         }
 
 
-putWithAuthorization : String -> Request ()
-putWithAuthorization url =
+putWithAuthorization : Body -> String -> Request ()
+putWithAuthorization menuBody url =
     let encodedAuthString =
         Result.withDefault ""
         <| Base64.encode "XfdfydY0q4ha0mOPWcHOli9+Il23vxWy:"
@@ -184,7 +220,7 @@ putWithAuthorization url =
         { method = "PUT"
         , headers = [ Http.header "Authorization" <| "Basic " ++ encodedAuthString]
         , url = url
-        , body = emptyBody
+        , body = menuBody
         , expect =  expectStringResponse (\_ -> Ok ())
         , timeout = Nothing
         , withCredentials = False
