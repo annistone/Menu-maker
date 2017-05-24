@@ -10,6 +10,7 @@ import Json.Decode.Extra exposing ((|:))
 import Json.Encode exposing (object, string, int)
 import Http exposing (jsonBody, Body)
 
+type DeleteOrAddFlag = Delete | Add
 
 type alias Meal =
     { id : String
@@ -36,12 +37,64 @@ type alias DayMenu =
     , snacksIds: List Int
     }
 
+type alias Component =
+    { id : String
+    , cost: Int
+    , calories: Int
+    , proteins: Int
+    , fats: Int
+    , carbohydrates: Int
+    , name: String
+    , componentId: Int
+    }
+
+initMeal: Meal
+initMeal =
+        { id = ""
+        , name = ""
+        , mealId = 0
+        , mealCategorieId = 0
+        , componentsIds = Array.fromList []
+        , recept = ""
+        , cost = 0
+        , calories = 0
+        , proteins = 0
+        , fats = 0
+        , carbohydrates = 0
+        }
+
+initComponent: Component
+initComponent =
+        { id = ""
+        , name = ""
+        , componentId = 0
+        , cost = 0
+        , calories = 0
+        , proteins = 0
+        , fats = 0
+        , carbohydrates = 0
+        }
 
 sortMenus: Array.Array DayMenu -> Array.Array DayMenu
 sortMenus weekMenu =
     Array.fromList
     <|List.sortBy .dayId
     <| Array.toList weekMenu
+
+
+categoryIdToCategoryName: Int -> String
+categoryIdToCategoryName number =
+    case number of
+        1 -> "Завтраки"
+        2 -> "Супы"
+        3 -> "Второе"
+        4 -> "Гарниры"
+        5 -> "Салаты"
+        6 -> "Закуски"
+        7 -> "Десерты"
+        8 -> "Напитки"
+        _ -> ""
+
 
 dayNumberToDayName: Int -> String
 dayNumberToDayName dayNumber =
@@ -65,10 +118,29 @@ mealtimeNumberToMealtimeName mealtimeNumber =
         3 -> "Перекус"
         _ -> ""
 
+
+componentIdToComponentName : Array.Array Component -> Int -> String
+componentIdToComponentName  componentsCatalog componentId =
+    List.foldr (++) ""
+    <| List.map .name
+    <| List.filter (\l -> l.componentId == componentId)
+    <| Array.toList componentsCatalog
+
+
+
 mealIdToMealName : Array.Array Meal -> Int -> String
 mealIdToMealName  mealsCatalog mealId =
     List.foldr (++) ""
     <| List.map .name
+    <| List.filter (\l -> l.mealId == mealId)
+    <| Array.toList mealsCatalog
+
+
+mealIdToMealComponents : Array.Array Meal -> Int -> List Int
+mealIdToMealComponents  mealsCatalog mealId =
+    List.concat
+    <| List.map Array.toList
+    <| List.map .componentsIds
     <| List.filter (\l -> l.mealId == mealId)
     <| Array.toList mealsCatalog
 
@@ -94,11 +166,17 @@ dayNumToDayMenu dayNumber weekMenu = Maybe.withDefault
         }
     <| Array.get dayNumber weekMenu
 
-mealText: Int -> Int -> Array.Array DayMenu -> Array.Array Meal -> String
-mealText mealtimeNumber dayNumber weekMenu mealsCatalog =
-    List.foldr (++) ""
-    <| List.intersperse ", "
-    <| List.map (\l -> mealIdToMealName mealsCatalog l)
+mealTextsAndIds: Int -> Int -> Array.Array DayMenu -> Array.Array Meal -> List (String, Int)
+mealTextsAndIds mealtimeNumber dayNumber weekMenu mealsCatalog =
+     List.map (\l -> (mealIdToMealName mealsCatalog l, l))
+    <| mealtimeNumberToMealtimeMenu mealtimeNumber
+    <| dayNumToDayMenu dayNumber weekMenu
+
+
+getMealtimeComponents: Int -> Int -> Array.Array DayMenu -> Array.Array Meal -> List Int
+getMealtimeComponents mealtimeNumber dayNumber weekMenu mealsCatalog =
+    List.concat
+    <| List.map (\l -> mealIdToMealComponents mealsCatalog l)
     <| mealtimeNumberToMealtimeMenu mealtimeNumber
     <| dayNumToDayMenu dayNumber weekMenu
 
@@ -119,6 +197,18 @@ mealDecoder =
         |: (field "carbohydrates" Json.Decode.int)
 
 
+componentDecoder: Json.Decode.Decoder Component
+componentDecoder =
+    Json.Decode.succeed Component
+        |: (field "id" Json.Decode.string)
+        |: (field "cost" Json.Decode.int)
+        |: (field "calories" Json.Decode.int)
+        |: (field "proteins" Json.Decode.int)
+        |: (field "fats" Json.Decode.int)
+        |: (field "carbohydrates" Json.Decode.int)
+        |: (field "name" Json.Decode.string)
+        |: (field "componentId" Json.Decode.int)
+
 dayMenuDecoder: Json.Decode.Decoder DayMenu
 dayMenuDecoder =
     map7 DayMenu
@@ -132,23 +222,33 @@ dayMenuDecoder =
 
 
 
-formAddMealDayMenu: Int -> Int -> Int -> Array.Array DayMenu -> DayMenu
-formAddMealDayMenu editMenuMealtime editMenuDay editMenuMealId weekMenu =
+formEditMealDayMenu: Int -> Int -> Int -> Array.Array DayMenu -> DeleteOrAddFlag -> DayMenu
+formEditMealDayMenu editMenuMealtime editMenuDay editMenuMealId weekMenu deleteOrAddFlag =
     let dayMenu =
         dayNumToDayMenu editMenuDay weekMenu
     in
-    case editMenuMealtime of
-        0 -> { dayMenu | breakfastMenuIds = editMenuMealId :: dayMenu.breakfastMenuIds}
-        1 -> { dayMenu | lunchMenuIds = editMenuMealId :: dayMenu.lunchMenuIds}
-        2 -> { dayMenu | dinnerMenuIds = editMenuMealId :: dayMenu.dinnerMenuIds}
-        3 -> { dayMenu | snacksIds = editMenuMealId :: dayMenu.snacksIds}
-        _ -> dayMenu
+    case deleteOrAddFlag of
+        Delete ->
+            case editMenuMealtime of
+                0 -> { dayMenu | breakfastMenuIds = List.filter (\l -> l /= editMenuMealId) dayMenu.breakfastMenuIds}
+                1 -> { dayMenu | lunchMenuIds = List.filter (\l -> l /= editMenuMealId) dayMenu.lunchMenuIds}
+                2 -> { dayMenu | dinnerMenuIds = List.filter (\l -> l /= editMenuMealId) dayMenu.dinnerMenuIds}
+                3 -> { dayMenu | snacksIds = List.filter (\l -> l /= editMenuMealId) dayMenu.snacksIds}
+                _ -> dayMenu
+
+        Add ->
+            case editMenuMealtime of
+                0 -> { dayMenu | breakfastMenuIds = editMenuMealId :: dayMenu.breakfastMenuIds}
+                1 -> { dayMenu | lunchMenuIds = editMenuMealId :: dayMenu.lunchMenuIds}
+                2 -> { dayMenu | dinnerMenuIds = editMenuMealId :: dayMenu.dinnerMenuIds}
+                3 -> { dayMenu | snacksIds = editMenuMealId :: dayMenu.snacksIds}
+                _ -> dayMenu
 
 
-formAddMealBody: Int -> Int -> Int -> Array.Array DayMenu -> Http.Body
-formAddMealBody editMenuMealtime editMenuDay editMenuMealId weekMenu =
+formEditMealBody: Int -> Int -> Int -> Array.Array DayMenu -> DeleteOrAddFlag -> Http.Body
+formEditMealBody editMenuMealtime editMenuDay editMenuMealId weekMenu deleteOrAddFlag=
     let dayMenu =
-        formAddMealDayMenu editMenuMealtime editMenuDay editMenuMealId weekMenu
+        formEditMealDayMenu editMenuMealtime editMenuDay editMenuMealId weekMenu deleteOrAddFlag
     in
     Http.jsonBody
     <| Json.Encode.object
